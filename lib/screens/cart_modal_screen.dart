@@ -1,3 +1,4 @@
+// lib/screens/cart_modal_screen.dart
 import 'package:flutter/material.dart';
 import '../widgets/cart_body.dart';
 
@@ -7,13 +8,14 @@ class CartModalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // fondo general claro
+      backgroundColor: Theme.of(context).colorScheme.surface, // Fondo gris claro
       appBar: AppBar(
         title: const Text('Carrito de Compras'),
-        backgroundColor: const Color(0xFF8B1E3F), // bordó oscuro
-        foregroundColor: Colors.white, // color del texto e ícono
+        backgroundColor: Colors.white, // Fondo blanco
+        foregroundColor: Colors.black, // Texto e íconos negros
+        elevation: 1, // Sombra ligera
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.close), // Icono de cerrar para modales
           onPressed: () => Navigator.pop(context),
         ),
       ),

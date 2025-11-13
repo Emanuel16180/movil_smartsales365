@@ -24,7 +24,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
   String _formatDate(String date) {
     try {
       final parsedDate = DateTime.parse(date);
-      return DateFormat('d \'de\' MMMM, y', 'es_ES').format(parsedDate);
+      return DateFormat('d \'de\' MMMM, y \'a las\' HH:mm', 'es_ES').format(parsedDate);
     } catch (e) {
       return date;
     }
@@ -32,12 +32,15 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // Fondo claro
+      backgroundColor: theme.colorScheme.surface, // Fondo gris claro
       appBar: AppBar(
         title: Text('Recibo #${widget.purchaseId}'),
-        backgroundColor: const Color(0xFF8B1E3F),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white, // Fondo blanco
+        foregroundColor: Colors.black, // Texto e íconos negros
+        elevation: 1, // Sombra ligera
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _receiptFuture,
@@ -61,82 +64,136 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Resumen
+                // --- Resumen (Sin cambios) ---
                 Card(
                   elevation: 2,
-                  color: Colors.white,
+                  color: theme.cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Resumen de Compra',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF8B1E3F),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Text(
+                            'Resumen de Compra',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary, // Azul
+                            ),
                           ),
                         ),
-                        const Divider(height: 20),
-                        _buildInfoRow('Cliente:', data['user']?['full_name'] ?? 'N/A'),
-                        _buildInfoRow('Email:', data['user']?['email'] ?? 'N/A'),
-                        _buildInfoRow('Fecha:', _formatDate(data['created_at'])),
-                        _buildInfoRow('Estado:', data['status']),
-                        const SizedBox(height: 10),
-                        _buildInfoRow(
-                          'Total Pagado:',
-                          'Bs. ${data['total_amount']}',
-                          isTotal: true,
+                        const SizedBox(height: 8),
+                        _buildInfoTile(Icons.person_outline, 'Cliente', data['user']?['full_name'] ?? 'N/A'),
+                        _buildInfoTile(Icons.mail_outline, 'Email', data['user']?['email'] ?? 'N/A'),
+                        _buildInfoTile(Icons.calendar_today_outlined, 'Fecha', _formatDate(data['created_at'])),
+                        _buildInfoTile(Icons.info_outline, 'Estado', data['status']),
+                        const Divider(height: 20, indent: 16, endIndent: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Total Pagado:', style: theme.textTheme.titleLarge),
+                              Text(
+                                'Bs. ${data['total_amount']}',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Productos
+                // --- Productos (Sin cambios) ---
                 Text(
                   'Productos Comprados (${details.length})',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold
+                  ),
                 ),
                 const SizedBox(height: 10),
-                ...details.map((item) => Card(
-                      color: Colors.white,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Image.network(
-                          item['product']?['image_url'] ?? '',
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c,e,s) => Icon(Icons.image_not_supported),
+                Card(
+                  elevation: 2,
+                  color: theme.cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView.separated(
+                    itemCount: details.length,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                    itemBuilder: (context, index) {
+                      final item = details[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            item['product']?['image_url'] ?? '',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c,e,s) => const Icon(Icons.image_not_supported),
+                          ),
                         ),
                         title: Text(item['product']?['name'] ?? 'Producto'),
                         subtitle: Text('Cantidad: ${item['quantity']}'),
-                        trailing: Text('Bs. ${item['price_at_purchase']} c/u'),
-                      ),
-                    )),
+                        trailing: Text('Bs. ${item['price_at_purchase']} c/u', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      );
+                    },
+                  ),
+                ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Garantías
+                // --- Garantías ---
                 Text(
                   'Garantías Activadas (${warranties.length})',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold
+                  ),
                 ),
                 const SizedBox(height: 10),
-                ...warranties.map((w) => Card(
-                      color: Colors.white,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.shield, color: Colors.green),
+                warranties.isEmpty
+                ? const Text('Esta compra no activó garantías.', style: TextStyle(color: Colors.black54))
+                : Card(
+                  elevation: 2,
+                  color: theme.cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView.separated(
+                    itemCount: warranties.length,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                    itemBuilder: (context, index) {
+                      final w = warranties[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        // --- ¡AQUÍ ESTÁ EL ÍCONO CAMBIADO! ---
+                        leading: const Icon(Icons.verified_outlined, color: Colors.green),
                         title: Text(w['product']?['name'] ?? 'Producto'),
                         subtitle: Text(
                           'Válida hasta: ${_formatDate(w['expiration_date'])}',
                         ),
-                      ),
-                    )),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           );
@@ -145,25 +202,18 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, color: Colors.black54),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isTotal ? 20 : 16,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal ? Color(0xFF8B1E3F) : Colors.black,
-            ),
-          ),
-        ],
+  // Widget de apoyo para el resumen
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.grey[600]),
+      title: Text(label, style: const TextStyle(color: Colors.black54)),
+      subtitle: Text(
+        value,
+        style: const TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.w500,
+          fontSize: 16
+        ),
       ),
     );
   }

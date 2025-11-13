@@ -1,27 +1,203 @@
+// lib/screens/garantias_screen.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:proyect_movil/models/warranty_model.dart';
+import 'package:proyect_movil/models/paginated_response.dart';
+import 'package:proyect_movil/services/sales_service.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class GarantiasScreen extends StatefulWidget {
+  const GarantiasScreen({super.key});
+
+  @override
+  State<GarantiasScreen> createState() => _GarantiasScreenState();
+}
+
+class _GarantiasScreenState extends State<GarantiasScreen> {
+  // ... (Toda la lógica de initState, dispose, fetch, loadMore, formatDate...
+  // ... permanece exactamente igual que antes) ...
+  final SalesService _salesService = SalesService();
+  final ScrollController _scrollController = ScrollController();
+  List<Warranty> _warranties = [];
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  String? _nextPageUrl;
+  bool _hasLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 100) {
+        _loadMoreWarranties();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchWarranties() async {
+    if(mounted) setState(() => _isLoading = true);
+    try {
+      final PaginatedResponse<Warranty> response =
+          await _salesService.getMyWarranties();
+      if (mounted) {
+        setState(() {
+          _warranties = response.results;
+          _nextPageUrl = response.nextUrl;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar garantías: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadMoreWarranties() async {
+    if (_isLoadingMore || _nextPageUrl == null) return;
+    if(mounted) setState(() => _isLoadingMore = true);
+
+    try {
+      final PaginatedResponse<Warranty> response =
+          await _salesService.getMyWarranties(url: _nextPageUrl);
+      if (mounted) {
+        setState(() {
+          _warranties.addAll(response.results);
+          _nextPageUrl = response.nextUrl;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  String _formatDate(String date) {
+    try {
+      final parsedDate = DateTime.parse(date);
+      return DateFormat('d \'de\' MMMM, y', 'es_ES').format(parsedDate);
+    } catch (e) {
+      return date;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // fondo claro bordó
-      appBar: AppBar(
-        title: const Text('Home'),
-        backgroundColor: const Color(0xFF8B1E3F), // bordó oscuro
-        foregroundColor: Colors.white, // texto blanco
-      ),
-      body: const Center(
-        child: Text(
-          '¡Bienvenido!',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF8B1E3F), // texto en color bordó
-          ),
-        ),
-      ),
-    );
+    if (!_hasLoaded) {
+      _hasLoaded = true;
+      _fetchWarranties();
+    }
+    final theme = Theme.of(context);
+
+    return RefreshIndicator(
+      onRefresh: _fetchWarranties,
+      color: theme.colorScheme.primary, 
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _warranties.isEmpty
+              ? Stack( 
+                  // ... (Vista de "vacío" sin cambios) ...
+                )
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12), 
+                  itemCount: _warranties.length + (_isLoadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _warranties.length) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final warranty = _warranties[index];
+
+                    // --- ¡AQUÍ ESTÁ LA LÓGICA DE FECHA! ---
+                    final DateTime now = DateTime.now();
+                    final DateTime? expirationDate = DateTime.tryParse(warranty.expirationDate);
+                    // Se considera vencida si la fecha de expiración es anterior a este preciso instante
+                    final bool isExpired = expirationDate == null ? false : expirationDate.isBefore(now); 
+                    
+                    final String statusText = isExpired ? 'Garantía Vencida' : 'Garantía Activa';
+                    final Color statusColor = isExpired ? Colors.red : Colors.green;
+                    final Color statusBgColor = isExpired ? Colors.red.withAlpha(50) : Colors.green.withAlpha(50);
+                    // -----------------------------------------
+
+                    return Card(
+                      elevation: 2,
+                      color: theme.cardColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.network(
+                                warranty.imageUrl,
+                                width: 70, 
+                                height: 70,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) =>
+                                    Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.image_not_supported, color: Colors.grey)),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    warranty.productName,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Vence: ${_formatDate(warranty.expirationDate)}',
+                                    style: const TextStyle(color: Colors.black54, fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // --- CHIP DE ESTADO DINÁMICO ---
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusBgColor, // Color dinámico
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      statusText, // Texto dinámico
+                                      style: TextStyle(
+                                        color: statusColor, // Color dinámico
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // --- ¡AQUÍ ESTÁ EL ÍCONO CAMBIADO! ---
+                            Icon(Icons.assignment_turned_in_outlined, color: statusColor, size: 28),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        );
   }
 }

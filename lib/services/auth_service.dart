@@ -20,9 +20,9 @@ class AuthService {
   final Dio _dio = Dio(
     BaseOptions(
       // 4. Apunta a tu backend en Render
-      baseUrl: 'https://smartsales365-backend.onrender.com/api/v1',
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
+      baseUrl: 'https://backend-smartsales365.onrender.com/api/v1',
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {
         "Content-Type": "application/json",
       },

@@ -1,12 +1,11 @@
+// lib/widgets/cart_body.dart
 import 'package:flutter/material.dart';
-// ¡Esta línea es la clave para arreglar el error de 'Card' de tu última foto!
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card; 
 import 'package:provider/provider.dart';
 import 'package:proyect_movil/services/sales_service.dart';
 import '../services/cart_service.dart';
 import '../models/cart_item_model.dart';
 
-// 1. Convertido a StatefulWidget para manejar el estado de carga
 class CartBody extends StatefulWidget {
   final bool showBack;
   final VoidCallback? onOrder;
@@ -21,7 +20,6 @@ class _CartBodyState extends State<CartBody> {
   final SalesService _salesService = SalesService();
   bool _isLoading = false;
 
-  // 2. Lógica de pago de Stripe
   Future<void> _handlePayment() async {
     setState(() {
       _isLoading = true;
@@ -29,7 +27,6 @@ class _CartBodyState extends State<CartBody> {
 
     final cart = Provider.of<CartService>(context, listen: false);
 
-    // Formatea el carrito como lo pide tu API
     final cartItems = cart.items.map((item) {
       return {
         'product_id': item.product.id,
@@ -38,7 +35,6 @@ class _CartBodyState extends State<CartBody> {
     }).toList();
 
     try {
-      // --- PASO 1: Crear Payment Intent en tu Backend ---
       final response = await _salesService.createPaymentIntent(cartItems);
 
       if (response['success'] == false) {
@@ -47,19 +43,18 @@ class _CartBodyState extends State<CartBody> {
 
       final clientSecret = response['clientSecret'];
 
-      // --- PASO 2: Inicializar la Hoja de Pago de Stripe ---
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'SmartSales365', // El nombre de tu tienda
+          merchantDisplayName: 'SmartSales365', 
         ),
       );
 
-      // --- PASO 3: Mostrar la Hoja de Pago ---
       await Stripe.instance.presentPaymentSheet();
 
-      // --- PASO 4: Éxito ---
-      cart.clearCart(); // Limpia el carrito
+      if (!mounted) return;
+
+      cart.clearCart(); 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('¡Pago completado con éxito!'),
@@ -69,14 +64,15 @@ class _CartBodyState extends State<CartBody> {
       
     } on StripeException catch (e) {
       if (e.error.code == FailureCode.Canceled) {
-        // El usuario canceló la hoja de pago
+        // El usuario canceló
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error de Stripe: ${e.error.localizedMessage}')),
         );
       }
     } catch (e) {
-      // Muestra errores de tu backend (ej. stock insuficiente)
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString().replaceAll("Exception: ", "")}'),
@@ -84,78 +80,91 @@ class _CartBodyState extends State<CartBody> {
         ),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if(mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartService>(context);
+    final theme = Theme.of(context); // <-- Obtenemos el tema
 
     return Column(
       children: [
         if (cart.items.isEmpty)
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 "Tu carrito está vacío",
-                style: TextStyle(color: Color(0xFF8B1E3F)),
+                style: TextStyle(color: Colors.grey[600], fontSize: 18),
               ),
             ),
           )
         else
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.all(10), // Añadimos padding
               itemCount: cart.items.length,
               itemBuilder: (context, index) {
                 final CartItem item = cart.items[index];
-                // Esto es un Flutter Card (Material)
                 return Card(
-                  color: const Color(0xFFFDEAEA),
+                  // --- ESTILO ACTUALIZADO ---
+                  color: theme.cardColor,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
                   margin:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      const EdgeInsets.symmetric(vertical: 8),
                   child: ListTile(
-                    leading: Image.network(
-                      item.product.imageUrl, // Usa el campo 'imageUrl'
-                      width: 60,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image, color: Colors.grey),
+                    contentPadding: const EdgeInsets.all(10),
+                    leading: ClipRRect( // <-- Para bordes redondeados
+                      borderRadius: BorderRadius.circular(8.0),
+                      child: Image.network(
+                        item.product.imageUrl, 
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.broken_image, color: Colors.grey),
+                      ),
                     ),
                     title: Text(item.product.name,
-                        style: const TextStyle(color: Color(0xFF8B1E3F))),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold
+                        )),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Bs. ${item.product.price.toStringAsFixed(2)}",
-                          style: const TextStyle(color: Colors.black87),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Text(
+                            "Bs. ${item.product.price.toStringAsFixed(2)}",
+                            style: TextStyle(
+                              color: theme.colorScheme.primary, // Azul
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
                         ),
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove),
-                              color: const Color(0xFF8B1E3F),
+                              icon: const Icon(Icons.remove_circle_outline),
+                              color: theme.colorScheme.primary,
                               onPressed: () {
-                                if (item.quantity > 1) {
-                                  item.quantity--;
-                                  cart.saveCartToLocalStorage();
-                                  cart.notifyListeners();
-                                }
+                                cart.decreaseQuantity(item.product);
                               },
                             ),
-                            Text(item.quantity.toString()),
+                            Text(item.quantity.toString(), style: theme.textTheme.bodyLarge),
                             IconButton(
-                              icon: const Icon(Icons.add),
-                              color: const Color(0xFF8B1E3F),
+                              icon: const Icon(Icons.add_circle_outline),
+                              color: theme.colorScheme.primary,
                               onPressed: () {
-                                if (item.quantity < item.product.stock) {
-                                  item.quantity++;
-                                  cart.saveCartToLocalStorage();
-                                  cart.notifyListeners();
-                                }
+                                cart.increaseQuantity(item.product);
                               },
                             ),
                           ],
@@ -163,8 +172,8 @@ class _CartBodyState extends State<CartBody> {
                       ],
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete),
-                      color: Colors.red[300],
+                      icon: const Icon(Icons.delete_outline),
+                      color: theme.colorScheme.error.withAlpha(204),
                       onPressed: () {
                         cart.removeFromCart(item.product);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,9 +190,9 @@ class _CartBodyState extends State<CartBody> {
           ),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Colors.black12)),
-            color: Color(0xFFF8E8E8),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: Colors.grey[200]!)),
+            color: theme.cardColor, // Fondo blanco
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -191,25 +200,27 @@ class _CartBodyState extends State<CartBody> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Subtotal:", style: TextStyle(fontSize: 18)),
+                  Text("Total:", style: theme.textTheme.titleLarge),
                   Text(
                     "Bs. ${cart.total.toStringAsFixed(2)}",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFF8B1E3F),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               ElevatedButton(
-                // Esto llama a la nueva función de Stripe
                 onPressed: (cart.items.isEmpty || _isLoading) ? null : _handlePayment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B1E3F),
+                  backgroundColor: theme.colorScheme.primary, // Azul
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12), // Bordes
+                  ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
@@ -220,7 +231,7 @@ class _CartBodyState extends State<CartBody> {
                           strokeWidth: 3,
                         ),
                       )
-                    : const Text("Realizar pedido"),
+                    : const Text("Realizar pedido", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

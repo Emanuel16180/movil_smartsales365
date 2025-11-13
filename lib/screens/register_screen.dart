@@ -1,67 +1,97 @@
+// lib/screens/register_screen.dart
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
+// 1. IMPORTA LA PANTALLA DE NAVEGACIÓN PRINCIPAL
+import 'app_navigation_screen.dart'; 
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  _RegisterScreenState createState() => _RegisterScreenState();
+  // 2. CORRIGE EL WARNING DE TIPO PRIVADO
+  RegisterScreenState createState() => RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+// 3. CORRIGE EL WARNING DE TIPO PRIVADO
+class RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final AuthService _authService = AuthService();
   String? errorMessage;
+  bool _isLoading = false; // Añadido para feedback
 
   void register() async {
+    setState(() {
+      _isLoading = true;
+      errorMessage = null;
+    });
+
     bool success = await _authService.register(
       emailController.text.trim(),
       passwordController.text.trim(),
     );
+
+    // 4. CORRIGE EL WARNING DE 'BUILDCONTEXT'
+    if (!mounted) return; 
+
     if (success) {
+      // 5. NAVEGA A LA PANTALLA CORRECTA
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const AppNavigationScreen()),
       );
     } else {
       setState(() {
         errorMessage = "Error en el registro";
+        _isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Usa el nuevo tema de la app
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // Fondo bordó claro
+      backgroundColor: theme.colorScheme.surface, // Fondo gris claro
       appBar: AppBar(
-        title: const Text('Registrarse'),
-        backgroundColor: const Color(0xFF8B1E3F), // Bordó oscuro
-        foregroundColor: Colors.white,
+        title: const Text('Crear Cuenta'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 1,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
+            TextFormField(
               controller: emailController,
               decoration: InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                prefixIcon: const Icon(Icons.email),
+                hintText: 'Correo electrónico',
+                prefixIcon: Icon(Icons.mail_outline, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
+            TextFormField(
               controller: passwordController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'Contraseña',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                prefixIcon: const Icon(Icons.lock),
+                hintText: 'Contraseña',
+                prefixIcon: Icon(Icons.lock_outline, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             if (errorMessage != null) ...[
@@ -76,17 +106,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: register,
+                onPressed: _isLoading ? null : register,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B1E3F), // Bordó oscuro
+                  backgroundColor: theme.colorScheme.primary, // Azul
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Registrarse',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Text(
+                        'Registrarse',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],

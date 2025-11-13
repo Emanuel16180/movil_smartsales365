@@ -39,9 +39,7 @@ class _GarantiasScreenState extends State<GarantiasScreen> {
   }
 
   Future<void> _fetchWarranties() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if(mounted) setState(() => _isLoading = true);
     try {
       final PaginatedResponse<Warranty> response =
           await _salesService.getMyWarranties();
@@ -54,9 +52,7 @@ class _GarantiasScreenState extends State<GarantiasScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al cargar garantías: $e')),
         );
@@ -66,7 +62,7 @@ class _GarantiasScreenState extends State<GarantiasScreen> {
 
   Future<void> _loadMoreWarranties() async {
     if (_isLoadingMore || _nextPageUrl == null) return;
-    setState(() { _isLoadingMore = true; });
+    if(mounted) setState(() => _isLoadingMore = true);
 
     try {
       final PaginatedResponse<Warranty> response =
@@ -79,18 +75,17 @@ class _GarantiasScreenState extends State<GarantiasScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() { _isLoadingMore = false; });
-      }
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
   String _formatDate(String date) {
     try {
       final parsedDate = DateTime.parse(date);
-      return DateFormat('d \'de\' MMMM, y', 'es_ES').format(parsedDate);
+      // Usamos un formato más limpio para la fecha de vencimiento
+      return DateFormat('dd/MM/yyyy', 'es_ES').format(parsedDate);
     } catch (e) {
-      return date;
+      return date; // Devuelve la fecha original si no se puede parsear
     }
   }
 
@@ -100,65 +95,132 @@ class _GarantiasScreenState extends State<GarantiasScreen> {
       _hasLoaded = true;
       _fetchWarranties();
     }
+    final theme = Theme.of(context);
 
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
-            onRefresh: _fetchWarranties,
-            color: const Color(0xFF8B1E3F),
-            child: _warranties.isEmpty
-                ? Stack( // Usamos un Stack para que el RefreshIndicator funcione en una lista vacía
-                    children: [
-                      ListView(
-                        physics: const AlwaysScrollableScrollPhysics(), // <- La clave
+    // No usamos Scaffold
+    return RefreshIndicator(
+      onRefresh: _fetchWarranties,
+      color: theme.colorScheme.primary, // Color azul
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _warranties.isEmpty
+              ? Stack( 
+                  children: [
+                    ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                    ),
+                    const Center(
+                      child: Text(
+                        'No tienes garantías activas.',
+                        style: TextStyle(fontSize: 18, color: Colors.black54),
                       ),
-                      const Center(
-                        child: Text(
-                          'No tienes garantías activas.',
-                          style: TextStyle(fontSize: 18, color: Colors.black54),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12), // Padding general
+                  itemCount: _warranties.length + (_isLoadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _warranties.length) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final warranty = _warranties[index];
+
+                    // --- ¡AQUÍ ESTÁ LA LÓGICA DE FECHA CORRECTA! ---
+                    final DateTime now = DateTime.now();
+                    // Obtenemos 'hoy' a las 00:00:00
+                    final DateTime today = DateTime(now.year, now.month, now.day); 
+                    final DateTime? expirationDate = DateTime.tryParse(warranty.expirationDate);
+                    
+                    bool isExpired = true; // Por defecto, vencida si hay error
+                    
+                    if (expirationDate != null) {
+                      // Obtenemos la fecha de expiración a las 00:00:00
+                      final DateTime expiryDay = DateTime(expirationDate.year, expirationDate.month, expirationDate.day);
+                      
+                      // La garantía está vencida si la fecha de expiración es ANTERIOR a hoy.
+                      // Si vence "hoy", todavía está activa.
+                      isExpired = expiryDay.isBefore(today);
+                    }
+                    
+                    final String statusText = isExpired ? 'Garantía Vencida' : 'Garantía Activa';
+                    final Color statusColor = isExpired ? Colors.red : Colors.green;
+                    final Color statusBgColor = isExpired ? Colors.red.withAlpha(50) : Colors.green.withAlpha(50);
+                    final IconData statusIcon = isExpired ? Icons.cancel_outlined : Icons.verified_outlined;
+                    // ------------------------------------------------
+
+                    return Card(
+                      elevation: 2,
+                      color: theme.cardColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.network(
+                                warranty.imageUrl,
+                                width: 70, 
+                                height: 70,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) =>
+                                    Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.image_not_supported, color: Colors.grey)),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    warranty.productName,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    // Usamos el formato dd/MM/yyyy
+                                    'Vence: ${_formatDate(warranty.expirationDate)}',
+                                    style: const TextStyle(color: Colors.black54, fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // --- CHIP DE ESTADO DINÁMICO ---
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusBgColor, // Color dinámico
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      statusText, // Texto dinámico
+                                      style: TextStyle(
+                                        color: statusColor, // Color dinámico
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // --- ¡ÍCONO DINÁMICO Y CORREGIDO! ---
+                            Icon(statusIcon, color: statusColor, size: 28),
+                          ],
                         ),
                       ),
-                    ],
-                  )
-                : ListView.builder(
-                    // --- ¡Y CAMBIO AQUÍ! ---
-                    // Añadimos 'physics' para que siempre se pueda deslizar
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _scrollController,
-                    itemCount: _warranties.length + (_isLoadingMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _warranties.length) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      final warranty = _warranties[index];
-                      return Card(
-                        color: Colors.white,
-                        margin:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        elevation: 2,
-                        child: ListTile(
-                          leading: Image.network(
-                            warranty.imageUrl,
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) =>
-                                const Icon(Icons.image_not_supported),
-                          ),
-                          title: Text(
-                            warranty.productName,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Vence: ${_formatDate(warranty.expirationDate)}',
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                          trailing: const Icon(Icons.shield, color: Colors.green),
-                        ),
-                      );
-                    },
-                  ),
-          );
+                    );
+                  },
+                ),
+        );
   }
 }

@@ -1,3 +1,4 @@
+// lib/screens/cart_screen.dart
 import 'package:flutter/material.dart';
 import 'package:proyect_movil/widgets/cart_body.dart';
 
@@ -7,13 +8,14 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // fondo claro
+      backgroundColor: Theme.of(context).colorScheme.surface, // Fondo gris claro
       appBar: AppBar(
         title: const Text('Carrito de Compras'),
-        backgroundColor: const Color(0xFF8B1E3F), // bordó oscuro
-        foregroundColor: Colors.white, // ícono y texto blanco
+        backgroundColor: Colors.white, // Fondo blanco
+        foregroundColor: Colors.black, // Texto e íconos negros
+        elevation: 1, // Sombra ligera
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back), // Icono de atrás
           onPressed: () => Navigator.pop(context),
         ),
       ),

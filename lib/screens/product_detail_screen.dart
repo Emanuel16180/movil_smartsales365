@@ -1,11 +1,10 @@
 // lib/screens/product_detail_screen.dart
-
 import 'package:flutter/material.dart';
-import 'package:proyect_movil/screens/cart_modal_screen.dart';
-import '../models/product_model.dart';
 import 'package:provider/provider.dart';
+import 'package:sizer/sizer.dart'; // Importe necesario para 'SizedBox(width: 3.w)'
+import '../models/product_model.dart';
 import '../services/cart_service.dart';
-import '../models/cart_item_model.dart';
+import '../screens/cart_modal_screen.dart'; // Para abrir el carrito modal
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -17,219 +16,324 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  int quantity = 1;
+  int _quantity = 1;
+
+  // --- ESTOS MÉTODOS AHORA SÍ SE USARÁN ---
+  void _increaseQuantity() {
+    setState(() {
+      if (_quantity < widget.product.stock) {
+        _quantity++;
+      }
+    });
+  }
+
+  void _decreaseQuantity() {
+    setState(() {
+      if (_quantity > 1) {
+        _quantity--;
+      }
+    });
+  }
+
+  void _addToCart() {
+    final cart = Provider.of<CartService>(context, listen: false);
+    for (int i = 0; i < _quantity; i++) {
+      cart.addToCart(widget.product);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$_quantity x ${widget.product.name} añadido al carrito.'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+  // --- FIN DE MÉTODOS ---
 
   @override
   Widget build(BuildContext context) {
-    final product = widget.product;
+    final theme = Theme.of(context);
+    final cartService = Provider.of<CartService>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8E8E8), // Fondo bordó claro
+      backgroundColor: theme.colorScheme.surface, // Fondo gris claro
+      extendBodyBehindAppBar: true, // Para que la imagen quede detrás del AppBar
       appBar: AppBar(
-        title: Text(
-          product.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        backgroundColor: Colors.transparent, // AppBar transparente
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: const Color(0xFF8B1E3F), // Bordó oscuro
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Imagen (usando el nuevo campo imageUrl)
-            AspectRatio(
-              aspectRatio: 1.5,
-              child: Image.network(
-                product.imageUrl,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    const Center(child: Icon(Icons.broken_image)),
-              ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(102), // Corregido de withOpacity
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 16),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: IconButton(
+              icon: const Icon(Icons.favorite_border, color: Colors.white),
+              onPressed: () {
+                // TODO: Lógica para favoritos
+              },
+            ),
+          ),
+          Stack(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(102), // Corregido de withOpacity
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        fullscreenDialog: true,
+                        builder: (context) => const CartModalScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (cartService.totalItems > 0) // Corregido a totalItems
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Text(
+                      '${cartService.totalItems}', // Corregido a totalItems
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+      // --- ¡EL BODY QUE FALTABA! ---
+      body: Column(
+        children: [
+          // Sección de imagen (ocupa 40% de la pantalla)
+          Expanded(
+            flex: 4,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.network(
+                    widget.product.imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Center(child: Icon(Icons.broken_image, size: 100, color: Colors.grey)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Sección de detalles del producto (ocupa 60% de la pantalla)
+          Expanded(
+            flex: 6,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.cardColor, // Fondo blanco para los detalles
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(13), // ~0.05 opacity
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Nombre del producto
                   Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 24,
+                    widget.product.name,
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
-
-                  // 2. Precio
-                  Text(
-                    "Bs. ${product.price.toStringAsFixed(2)}",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      color: Color(0xFF8B1E3F), // Precio en color bordó
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // 3. Marca (usando el nuevo campo aplanado)
-                  Text(
-                    "Marca: ${product.brand}",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 4. Selector de Cantidad
+                  const SizedBox(height: 10),
+                  // Precio y stock
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Cantidad:", style: TextStyle(fontSize: 16)),
-                      const SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () {
-                          if (quantity > 1) {
-                            setState(() {
-                              quantity--;
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.remove_circle_outline),
-                        color: const Color(0xFF8B1E3F),
-                      ),
-                      Text(quantity.toString(),
-                          style: const TextStyle(fontSize: 18)),
-                      IconButton(
-                        onPressed: () {
-                          if (quantity < product.stock) {
-                            setState(() {
-                              quantity++;
-                            });
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Stock máximo alcanzado'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.add_circle_outline),
-                        color: const Color(0xFF8B1E3F),
-                      ),
-                      const SizedBox(width: 10),
                       Text(
-                        "(${product.stock} en stock)",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                        "Bs. ${widget.product.price.toStringAsFixed(2)}",
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: widget.product.stock > 0 ? Colors.green.withAlpha(26) : Colors.red.withAlpha(26), // ~0.1 opacity
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          widget.product.stock > 0 ? 'En Stock: ${widget.product.stock}' : 'Sin Stock',
+                          style: TextStyle(
+                            color: widget.product.stock > 0 ? Colors.green[700] : Colors.red[700],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 20),
-
-                  // 5. Descripción
-                  const Text(
-                    "Descripción:",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    product.description,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // 6. Garantía (usando el objeto warranty)
-                  const Text(
-                    "Garantía:",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "${product.warranty['title'] ?? 'No especificada'} (${product.warranty['duration_days'] ?? 0} días)",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  Text(
-                    product.warranty['terms'] ?? '',
-                    style: const TextStyle(fontSize: 14, color: Colors.black54),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // Botón de Agregar al carrito
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: product.stock > 0 ? () {
-                        final cart = Provider.of<CartService>(context, listen: false);
-                        
-                        // Lógica para no agregar más del stock
-                        final itemEnCarrito = cart.items.firstWhere(
-                          (item) => item.product.id == product.id,
-                          orElse: () => CartItem(product: product, quantity: 0),
-                        );
-                        final cantidadActual = itemEnCarrito.quantity;
-
-                        if (cantidadActual + quantity > product.stock) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('No puedes agregar más del stock disponible (${product.stock})')),
-                          );
-                          return;
-                        }
-
-                        // Agrega al carrito
-                        for (int i = 0; i < quantity; i++) {
-                          cart.addToCart(product);
-                        }
-                        
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            fullscreenDialog: true,
-                            builder: (context) => const CartModalScreen(),
+                  // Descripción y Garantía
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. SECCIÓN DE DESCRIPCIÓN
+                          Text(
+                            'Descripción',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
-                        );
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text(
-                                  '$quantity ${product.name} agregado(s) al carrito')),
-                        );
-                      }
-                      : null, // Deshabilita el botón si no hay stock
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B1E3F),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        product.stock > 0 ? "Agregar al carrito" : "Sin Stock",
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.product.description,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: Colors.grey[700],
+                              height: 1.5,
+                            ),
+                          ),
+                          
+                          // 2. SECCIÓN DE GARANTÍA
+                          const SizedBox(height: 20),
+                          Text(
+                            'Garantía',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "${widget.product.warranty['title'] ?? 'No especificada'} (${widget.product.warranty['duration_days'] ?? 0} días)",
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.product.warranty['terms'] ?? '',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 30), // Espacio extra
+                  const SizedBox(height: 20),
+                  // Selector de cantidad y botón de añadir al carrito
+                  Row(
+                    children: [
+                      // Selector de cantidad
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.remove, color: theme.colorScheme.primary, size: 20),
+                              onPressed: _decreaseQuantity, // <-- Ahora se usa
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                _quantity.toString(),
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.add, color: theme.colorScheme.primary, size: 20),
+                              onPressed: _increaseQuantity, // <-- Ahora se usa
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 3.w), // <-- Ahora Sizer se usa
+                      // Botón Añadir al Carrito
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: widget.product.stock > 0 ? _addToCart : null, // <-- Ahora se usa
+                          icon: const Icon(Icons.shopping_cart_outlined, size: 20),
+                          label: Text(
+                            widget.product.stock > 0 ? 'Añadir al Carrito' : 'Sin Stock',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

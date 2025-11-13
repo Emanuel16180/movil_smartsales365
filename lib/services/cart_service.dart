@@ -42,6 +42,33 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- PEGA ESTOS DOS MÉTODOS AQUÍ ---
+  void increaseQuantity(Product product) {
+    final index = _items.indexWhere((item) => item.product.id == product.id);
+    if (index >= 0) {
+      if (_items[index].quantity < product.stock) {
+        _items[index].quantity += 1;
+        saveCartToLocalStorage();
+        notifyListeners();
+      }
+    }
+  }
+
+  void decreaseQuantity(Product product) {
+    final index = _items.indexWhere((item) => item.product.id == product.id);
+    if (index >= 0) {
+      if (_items[index].quantity > 1) {
+        _items[index].quantity -= 1;
+        saveCartToLocalStorage();
+        notifyListeners();
+      } else {
+        // Si la cantidad es 1 y se presiona "-", eliminamos el producto
+        removeFromCart(product);
+      }
+    }
+  }
+  // --- FIN DE MÉTODOS A PEGAR ---
+
   double get total {
     return _items.fold(0.0, (sum, item) => sum + item.subtotal);
   }
