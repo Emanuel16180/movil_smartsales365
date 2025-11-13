@@ -1,202 +1,209 @@
+// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import 'app_navigation_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:sizer/sizer.dart';
+import 'package:proyect_movil/services/auth_service.dart';
+import 'package:proyect_movil/screens/app_navigation_screen.dart';
+import 'package:proyect_movil/screens/register_screen.dart';
+
+// --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+import 'package:proyect_movil/widgets/logo_widget.dart';
+import 'package:proyect_movil/widgets/login_form_widget.dart';
+// ---------------------------------
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  bool rememberMe = false;
-  bool obscurePassword = true;
-  String? errorMessage;
-  bool _loading = false; // Estado para el indicador de carga
+  bool _isLoading = false;
+  final ScrollController _scrollController = ScrollController();
 
-  void login() async {
-    // 1. Iniciar la carga y limpiar errores
-    setState(() {
-      _loading = true;
-      errorMessage = null;
-    });
-
-    // 2. Llamar al servicio de autenticación
-    final response = await _authService.login(
-      emailController.text.trim(),
-      passwordController.text.trim(),
-    );
-
-    // 3. Manejar la respuesta del servicio
-    if (response['success'] == true) {
-      // Login exitoso: Navegar a la pantalla de inicio
-      // No es necesario setState, ya que el widget se reemplazará
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AppNavigationScreen()),
-        );
-      }
-    } else {
-      // Login fallido: Mostrar el mensaje de error
-      setState(() {
-        errorMessage = response['message'] ?? "Error desconocido. Intente de nuevo.";
-        _loading = false; // Detener la carga
-      });
-    }
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
+  Future<void> _handleLogin(String email, String password) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _authService.login(
+        email.trim(),
+        password.trim(),
+      );
+
+      // --- ARREGLO DE WARNING (use_build_context_synchronously) ---
+      if (!mounted) return;
+      // ---------------------------------------------------------
+
+      if (response['success'] == true) {
+        HapticFeedback.lightImpact();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('¡Bienvenido/a!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // --- ARREGLO DE WARNING (use_build_context_synchronously) ---
+        if (!mounted) return;
+        // ---------------------------------------------------------
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const AppNavigationScreen()),
+        );
+      } else {
+        _showErrorMessage(
+            response['message'] ?? 'Error desconocido. Intente de nuevo.');
+      }
+    } catch (e) {
+      _showErrorMessage('Error de conexión. Verifica tu conexión a internet.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _showErrorMessage(String message) {
+    if (mounted) {
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+  
+  void _navigateToRegistration() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RegisterScreen()),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Fondo degradado estilo bordó
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF8B1E3F), Color(0xFFF8E8E8)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              width: 350,
-              height: 470,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(25),
-                color: Colors.white.withOpacity(0.1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: EdgeInsets.symmetric(horizontal: 6.w),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.white12,
-                    child: Icon(Icons.person, size: 50, color: Colors.white),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: emailController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Email ID',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      prefixIcon: const Icon(Icons.email, color: Colors.white),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
+                  SizedBox(height: 8.h),
+
+                  // 1. Logo (Widget separado)
+                  const LogoWidget(),
+                  SizedBox(height: 6.h),
+
+                  // 2. Formulario de Login (Widget separado)
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(maxWidth: 90.w),
+                    padding: EdgeInsets.all(6.w),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(4.w),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Iniciar Sesión',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 1.h),
+                        Text(
+                          'Accede a tu cuenta SmartSales365',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                        SizedBox(height: 4.h),
+                        
+                        LoginFormWidget(
+                          onLogin: _handleLogin,
+                          isLoading: _isLoading,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: obscurePassword,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      prefixIcon: const Icon(Icons.lock, color: Colors.white),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  
+                  SizedBox(height: 4.h), 
+
+                  // 4. Link de Registro
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: rememberMe,
-                            activeColor: Colors.white,
-                            checkColor: Colors.black,
-                            onChanged: (value) {
-                              setState(() {
-                                rememberMe = value!;
-                                obscurePassword = !rememberMe;
-                              });
-                            },
-                          ),
-                          const Text("Remember me",
-                              style: TextStyle(color: Colors.white)),
-                        ],
+                      Text(
+                        '¿Nuevo usuario? ',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       TextButton(
-                        onPressed: () {},
-                        child: const Text("Forgot Password?",
-                            style: TextStyle(color: Colors.white70)),
+                        onPressed: _isLoading ? null : _navigateToRegistration,
+                        child: Text(
+                          'Crear Cuenta',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
                       ),
                     ],
                   ),
-                  if (errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Text(
-                        errorMessage!,
-                        style:
-                            const TextStyle(color: Colors.redAccent, fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : login, // Deshabilita el botón al cargar
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B1E3F),
-                        disabledBackgroundColor:
-                            const Color(0xFF8B1E3F).withOpacity(0.7),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: _loading
-                          ? const SizedBox(
-                              width: 25,
-                              height: 25,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                            )
-                          : const Text(
-                              "LOGIN",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
+
+                  SizedBox(height: 4.h),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
