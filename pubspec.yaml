@@ -43,7 +43,7 @@ dependencies:
   intl: ^0.20.2
   speech_to_text: ^7.3.0
   sizer: ^2.0.15
-  
+  flutter_local_notifications: ^18.0.1
   
 
 dev_dependencies:

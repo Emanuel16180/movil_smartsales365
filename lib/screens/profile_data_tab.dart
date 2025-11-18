@@ -16,12 +16,12 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
   bool _isEditing = false;
   bool _isSaving = false;
 
-  // Controladores para los campos de edición
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _firstNameController;
-  late TextEditingController _lastNameController;
-  late TextEditingController _phoneController;
-  late TextEditingController _addressController;
+  // Inicializamos inmediatamente para evitar LateInitializationError
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
 
   @override
   void initState() {
@@ -29,35 +29,34 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
     _loadProfile();
   }
 
-  // Carga o recarga el perfil del usuario
   void _loadProfile() {
     _profileFuture = _userService.getUserProfile();
-    // Cuando el perfil se carga, inicializa los controladores
     _profileFuture.then((user) {
-      _firstNameController = TextEditingController(text: user.firstName);
-      _lastNameController = TextEditingController(text: user.lastName);
-      _phoneController = TextEditingController(text: user.phoneNumber);
-      _addressController = TextEditingController(text: user.address);
+      if (mounted) {
+        // Actualizamos los controladores solo si el widget sigue vivo
+        _firstNameController.text = user.firstName ?? '';
+        _lastNameController.text = user.lastName ?? '';
+        _phoneController.text = user.phoneNumber ?? '';
+        _addressController.text = user.address ?? '';
+      }
+    }).catchError((error) {
+      // Manejo silencioso de errores aquí, ya lo muestra el FutureBuilder
     });
   }
 
-  // Activa/desactiva el modo de edición
   void _toggleEdit() {
     setState(() {
       _isEditing = !_isEditing;
     });
   }
 
-  // Guarda los cambios del perfil
   Future<void> _saveProfile() async {
-    // Valida el formulario antes de guardar
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
-      return; // No hacer nada si el formulario no es válido
+      return;
     }
       
     setState(() => _isSaving = true);
     
-    // Datos a enviar (solo los campos editables)
     Map<String, dynamic> updatedData = {
       'first_name': _firstNameController.text,
       'last_name': _lastNameController.text,
@@ -72,25 +71,25 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
           const SnackBar(content: Text('Perfil actualizado con éxito'), backgroundColor: Colors.green),
         );
       }
-      // Recarga los datos del perfil y sale del modo edición
-      _loadProfile();
-      setState(() {
-        _isEditing = false;
-        _isSaving = false;
-      });
+      _loadProfile(); // Recargar datos
+      if(mounted) {
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+      }
     } catch (e) {
         if(mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red),
         );
         }
-      setState(() => _isSaving = false);
+      if(mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   void dispose() {
-    // Limpia los controladores
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
@@ -100,7 +99,6 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Usa un FutureBuilder para manejar el estado de carga
     return FutureBuilder<UserModel>(
       future: _profileFuture,
       builder: (context, snapshot) {
@@ -119,20 +117,18 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
           return const Center(child: Text('No se encontró el perfil.'));
         }
 
-        // Una vez que los datos están listos, muestra la vista
         final user = snapshot.data!;
         return _buildProfileView(user);
       },
     );
   }
 
-  // Construye la UI principal de la pestaña
   Widget _buildProfileView(UserModel user) {
     final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Form(
-        key: _formKey, // Asigna la llave al Form
+        key: _formKey,
         child: Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -176,7 +172,6 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
                   controller: _lastNameController,
                 ),
                 const Divider(height: 24),
-                // El correo no es editable
                 _buildInfoRow(
                   context,
                   icon: Icons.mail_outline,
@@ -202,7 +197,6 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
                   controller: _addressController,
                   keyboardType: TextInputType.streetAddress,
                 ),
-                // Muestra el botón de guardar solo si está en modo edición
                 if (_isEditing) ...[
                   const SizedBox(height: 24),
                   SizedBox(
@@ -232,7 +226,6 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
     );
   }
 
-  // Widget de apoyo para mostrar una fila de info (texto o campo de edición)
   Widget _buildInfoRow(
     BuildContext context, {
     required IconData icon,
@@ -243,7 +236,6 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
     TextInputType? keyboardType,
   }) {
     final theme = Theme.of(context);
-    // Decide si mostrar el campo de texto o el texto normal
     bool isEditingThisField = _isEditing && isEditable && controller != null;
 
     return Row(
@@ -269,17 +261,14 @@ class _ProfileDataTabState extends State<ProfileDataTab> {
                     contentPadding: EdgeInsets.symmetric(vertical: 4),
                     border: UnderlineInputBorder(),
                   ),
-                  // Validación simple
                   validator: (val) {
-                    if (val == null || val.isEmpty) {
-                      return 'Este campo no puede estar vacío';
-                    }
+                    // Validación opcional: permitir vacío si así lo deseas
                     return null;
                   },
                 )
               else
                 Text(
-                  value.isEmpty ? 'No especificado' : value, // Muestra 'No especificado' si está vacío
+                  value.isEmpty ? 'No especificado' : value,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w500,
                     color: value.isEmpty ? Colors.grey[500] : Colors.black

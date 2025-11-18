@@ -1,6 +1,7 @@
 // lib/widgets/product_card.dart
 import 'package:flutter/material.dart';
 import 'package:proyect_movil/services/cart_service.dart';
+import 'package:proyect_movil/providers/favorites_provider.dart'; // <-- Importar
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 import '../models/product_model.dart';
@@ -15,10 +16,12 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cart = Provider.of<CartService>(context, listen: false);
+    // Escuchamos el provider de favoritos
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final isFav = favoritesProvider.isFavorite(product.id); // ¿Es favorito?
 
     return GestureDetector(
       onTap: () {
-        // Navega a la pantalla de detalle
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -29,14 +32,13 @@ class ProductCard extends StatelessWidget {
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
-        color: Colors.white, // Fondo blanco explícito
+        color: Colors.white,
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen del producto
             AspectRatio(
-              aspectRatio: 1.1, // Un poco más alto
+              aspectRatio: 1.1,
               child: Stack(
                 children: [
                   Positioned.fill(
@@ -52,28 +54,34 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Botón de corazón (opcional, como en la imagen)
+                  // --- BOTÓN DE CORAZÓN FUNCIONAL ---
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.favorite_border,
-                        size: 20,
-                        color: Colors.grey,
+                    child: GestureDetector(
+                      onTap: () {
+                        favoritesProvider.toggleFavorite(product);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black12)]
+                        ),
+                        child: Icon(
+                          isFav ? Icons.favorite : Icons.favorite_border,
+                          size: 20,
+                          color: isFav ? Colors.red : Colors.grey,
+                        ),
                       ),
                     ),
                   )
+                  // ----------------------------------
                 ],
               ),
             ),
-
-            // Contenedor para el texto
+            // ... (resto del código de textos y botón de carrito igual que antes)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10.0),
@@ -81,16 +89,14 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // --- COMO PEDISTE: Solo Nombre, Precio y Stock ---
                     Text(
                       product.name,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500, // Menos pesado que bold
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -105,7 +111,6 @@ class ProductCard extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                           
                             Text(
                               "Stock: ${product.stock}",
                               style: TextStyle(
@@ -118,7 +123,6 @@ class ProductCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        // --- Botón de Añadir al Carrito ---
                         GestureDetector(
                           onTap: () {
                              cart.addToCart(product);

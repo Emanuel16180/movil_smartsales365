@@ -5,6 +5,7 @@ import 'package:sizer/sizer.dart'; // Importe necesario para 'SizedBox(width: 3.
 import '../models/product_model.dart';
 import '../services/cart_service.dart';
 import '../screens/cart_modal_screen.dart'; // Para abrir el carrito modal
+import 'package:proyect_movil/providers/favorites_provider.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -54,6 +55,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cartService = Provider.of<CartService>(context);
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final isFav = favoritesProvider.isFavorite(widget.product.id);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface, // Fondo gris claro
@@ -73,9 +76,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.favorite_border, color: Colors.white),
+              icon: Icon(
+                isFav ? Icons.favorite : Icons.favorite_border, 
+                color: isFav ? Colors.red : Colors.white
+              ),
               onPressed: () {
-                // TODO: Lógica para favoritos
+                favoritesProvider.toggleFavorite(widget.product);
               },
             ),
           ),

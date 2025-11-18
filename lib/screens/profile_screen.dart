@@ -4,6 +4,7 @@ import 'package:proyect_movil/screens/garantias_screen.dart';
 import 'package:proyect_movil/screens/mis_compras_screen.dart';
 // --- 1. Importa el nuevo widget ---
 import 'package:proyect_movil/screens/profile_data_tab.dart'; 
+import 'package:proyect_movil/screens/favorites_tab.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -43,8 +44,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           labelColor: theme.colorScheme.primary,
           unselectedLabelColor: Colors.grey,
           indicatorColor: theme.colorScheme.primary,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Mis Datos'),
+            Tab(text: 'Favoritos'),
             Tab(text: 'Compras'),
             Tab(text: 'Garantías'),
           ],
@@ -55,6 +58,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         children: const [
           // --- 2. Reemplaza el placeholder por el nuevo widget ---
           ProfileDataTab(),
+
+          FavoritesTab(), 
 
           // 3. Tu pantalla existente "Mis Compras"
           MisComprasScreen(),
