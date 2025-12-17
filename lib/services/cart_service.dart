@@ -1,23 +1,70 @@
 // lib/services/cart_service.dart
-// Servicio singleton que mantiene el estado del carrito en memoria y lo comparte globalmente en la app
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
 import '../models/cart_item_model.dart';
+import 'package:proyect_movil/services/sales_service.dart'; // Importar SalesService
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class CartService extends ChangeNotifier {
   static final CartService _instance = CartService._internal();
-
   factory CartService() => _instance;
-
   CartService._internal();
 
   final List<CartItem> _items = [];
+  final SalesService _salesService = SalesService(); // Instancia para validar
 
+  // VARIABLES DE CUPÓN
+  String? _appliedCouponCode;
+  double _discountAmount = 0.0;
+  bool _isCouponApplied = false;
+
+  // GETTERS
   List<CartItem> get items => _items;
-  //Agrega producto o suma cantidad si ya está
+  String? get couponCode => _appliedCouponCode;
+  bool get isCouponApplied => _isCouponApplied;
+  double get discountAmount => _discountAmount;
+
+  // Subtotal (Suma de productos)
+  double get subtotal {
+    return _items.fold(0.0, (sum, item) => sum + item.subtotal);
+  }
+
+  // Total Final (Subtotal - Descuento)
+  double get total {
+    double t = subtotal - _discountAmount;
+    return t < 0 ? 0.0 : t;
+  }
+
+  int get totalItems {
+    return _items.fold(0, (sum, item) => sum + item.quantity);
+  }
+
+  // --- MÉTODOS DE CUPÓN ---
+  Future<void> applyCoupon(String code) async {
+    try {
+      final result = await _salesService.validateCoupon(code);
+      if (result['valid'] == true) {
+        _appliedCouponCode = result['code'];
+        _discountAmount = double.parse(result['discount'].toString());
+        _isCouponApplied = true;
+        notifyListeners();
+      }
+    } catch (e) {
+      removeCoupon(); // Si falla, limpiamos
+      rethrow;
+    }
+  }
+
+  void removeCoupon() {
+    _appliedCouponCode = null;
+    _discountAmount = 0.0;
+    _isCouponApplied = false;
+    notifyListeners();
+  }
+  // ------------------------
+
   void addToCart(Product product) {
     final index = _items.indexWhere((item) => item.product.id == product.id);
     if (index >= 0) {
@@ -29,7 +76,6 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-//Elimina el producto completamente del carrito
   void removeFromCart(Product product) {
     _items.removeWhere((item) => item.product.id == product.id);
     saveCartToLocalStorage();
@@ -38,11 +84,11 @@ class CartService extends ChangeNotifier {
 
   void clearCart() {
     _items.clear();
+    removeCoupon(); // Limpiamos el cupón al vaciar carrito
     saveCartToLocalStorage();
     notifyListeners();
   }
 
-  // --- PEGA ESTOS DOS MÉTODOS AQUÍ ---
   void increaseQuantity(Product product) {
     final index = _items.indexWhere((item) => item.product.id == product.id);
     if (index >= 0) {
@@ -62,22 +108,11 @@ class CartService extends ChangeNotifier {
         saveCartToLocalStorage();
         notifyListeners();
       } else {
-        // Si la cantidad es 1 y se presiona "-", eliminamos el producto
         removeFromCart(product);
       }
     }
   }
-  // --- FIN DE MÉTODOS A PEGAR ---
 
-  double get total {
-    return _items.fold(0.0, (sum, item) => sum + item.subtotal);
-  }
-
-  int get totalItems {
-    return _items.fold(0, (sum, item) => sum + item.quantity);
-  }
-
-  //guardar en el carito
   Future<void> saveCartToLocalStorage() async {
     final prefs = await SharedPreferences.getInstance();
     final cartData = _items
@@ -88,11 +123,11 @@ class CartService extends ChangeNotifier {
                 'description': item.product.description,
                 'price': item.product.price,
                 'brand': item.product.brand,
-                'image_url': item.product.imageUrl, // <-- CAMBIO AQUÍ
+                'image_url': item.product.imageUrl,
                 'stock': item.product.stock,
                 'size': item.product.size,
                 'category': item.product.categoryId,
-                'warranty': item.product.warranty, // <-- CAMBIO AQUÍ
+                'warranty': item.product.warranty,
               },
               'quantity': item.quantity
             })
@@ -101,7 +136,6 @@ class CartService extends ChangeNotifier {
     await prefs.setString('cart', jsonEncode(cartData));
   }
 
-//cargar en el carrito
   Future<void> loadCartFromLocalStorage() async {
     final prefs = await SharedPreferences.getInstance();
     final cartString = prefs.getString('cart');
@@ -118,11 +152,11 @@ class CartService extends ChangeNotifier {
             description: productData['description'],
             price: (productData['price'] as num).toDouble(),
             brand: productData['brand'],
-            imageUrl: productData['image_url'], // <-- CAMBIO AQUÍ
+            imageUrl: productData['image_url'],
             stock: productData['stock'],
             size: productData['size'],
             categoryId: productData['category'],
-            warranty: productData['warranty'], // <-- CAMBIO AQUÍ
+            warranty: productData['warranty'],
           ),
           quantity: entry['quantity'],
         );

@@ -1,3 +1,4 @@
+// lib/services/sales_service.dart
 import 'package:dio/dio.dart';
 import 'package:proyect_movil/services/auth_service.dart';
 import 'package:proyect_movil/models/purchase_model.dart';
@@ -7,14 +8,47 @@ import 'package:proyect_movil/models/paginated_response.dart';
 class SalesService {
   final Dio _dio = AuthService().dio; // Usa el Dio Singleton
 
-  // --- NUEVA FUNCIÓN PARA CREAR EL INTENTO DE PAGO ---
-  Future<Map<String, dynamic>> createPaymentIntent(List<Map<String, dynamic>> cartItems) async {
+  // --- 1. NUEVA FUNCIÓN: VALIDAR CUPÓN ---
+  Future<Map<String, dynamic>> validateCoupon(String code) async {
     try {
       final response = await _dio.post(
+        '/sales/coupons/validate/',
+        data: {'code': code},
+      );
+      // Retorna {valid: true, code: "...", discount: 50.0}
+      return response.data;
+    } on DioException catch (e) {
+       // Si el cupón no existe o expiró (400/404) o error de permisos (403)
+       print("🔥 [DEBUG] Status Code: ${e.response?.statusCode}"); 
+       print("🔥 [DEBUG] Datos del error: ${e.response?.data}");
+       
+       if (e.response != null && e.response?.data != null) {
+          final data = e.response!.data;
+          // Busca el mensaje en 'error', 'detail' o 'message'
+          final serverMessage = data['error'] ?? data['detail'] ?? data['message'] ?? 'Cupón inválido';
+          throw Exception(serverMessage);
+       }
+       throw Exception('Error al validar cupón');
+    }
+  }
+
+  // --- 2. ACTUALIZADO: CREAR INTENTO DE PAGO CON CUPÓN Y DELIVERY ---
+  // Ahora acepta 'couponCode' y 'deliveryInfo'
+  Future<Map<String, dynamic>> createPaymentIntent(
+    List<Map<String, dynamic>> cartItems, {
+    String? couponCode,
+    Map<String, dynamic>? deliveryInfo, // <--- NUEVO PARÁMETRO PARA DELIVERY
+  }) async {
+    try {
+      final data = {
+        'cart': cartItems,
+        if (couponCode != null) 'coupon_code': couponCode, 
+        if (deliveryInfo != null) 'delivery_info': deliveryInfo, // <--- SE ENVÍA AL BACKEND
+      };
+
+      final response = await _dio.post(
         '/sales/create-payment-intent/',
-        data: {
-          'cart': cartItems, // Envía el carrito en el formato que tu API espera
-        },
+        data: data,
       );
       
       // Devuelve éxito y el clientSecret
@@ -22,7 +56,6 @@ class SalesService {
 
     } on DioException catch (e) {
       if (e.response?.statusCode == 400) {
-        // Error de stock o carrito inválido
         return {'success': false, 'message': e.response?.data['error'] ?? 'Stock insuficiente o error en el carrito.'};
       }
       return {'success': false, 'message': 'Error al crear intento de pago: ${e.response?.data}'};
@@ -31,8 +64,7 @@ class SalesService {
     }
   }
 
-  // --- FUNCIONES EXISTENTES (MIS COMPRAS Y GARANTÍAS) ---
-
+  // --- FUNCIONES EXISTENTES ---
   Future<PaginatedResponse<Purchase>> getMyPurchases({String? url}) async {
     String endpoint = url ?? '/sales/my-purchases/';
     try {

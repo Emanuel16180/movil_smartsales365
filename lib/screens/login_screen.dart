@@ -15,6 +15,8 @@ import 'package:proyect_movil/services/notification_service.dart';
 import 'package:proyect_movil/services/sales_service.dart';
 import 'package:proyect_movil/models/warranty_model.dart';
 import 'package:proyect_movil/models/paginated_response.dart'; // Necesario para manejar la respuesta paginada
+import 'package:proyect_movil/screens/delivery_dashboard_screen.dart'; 
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -116,54 +118,55 @@ class _LoginScreenState extends State<LoginScreen> {
   // -------------------------------------------------------------
 
   Future<void> _handleLogin(String email, String password) async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final response = await _authService.login(
-        email.trim(),
-        password.trim(),
-      );
+      final response = await _authService.login(email.trim(), password.trim());
 
       if (!mounted) return;
 
       if (response['success'] == true) {
         HapticFeedback.lightImpact();
         
-        // --- ¡AQUÍ LLAMAMOS A LA NOTIFICACIÓN! ---
-        // No usamos 'await' aquí para que la navegación sea rápida y la búsqueda se haga en segundo plano
-        _checkNextWarranty(); 
-        // -----------------------------------------
-        
+        // Obtenemos el rol de la respuesta
+        String role = response['role'] ?? 'CUSTOMER';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('¡Bienvenido/a!'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            behavior: SnackBarBehavior.floating,
+            content: Text('Bienvenido ($role)'), // Feedback visual
+            backgroundColor: Colors.green,
           ),
         );
 
         await Future.delayed(const Duration(milliseconds: 500));
-
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => const AppNavigationScreen()),
-        );
+
+        // --- BIFURCACIÓN DE RUTEO ---
+        if (role == 'DELIVERY') {
+          // Si es repartidor -> Dashboard de Entregas
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DeliveryDashboardScreen()),
+          );
+        } else {
+          // Si es cliente (o cualquier otro) -> Tienda Normal
+          // Aquí también ejecutamos la lógica de notificaciones de garantía si es cliente
+          _checkNextWarranty(); 
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AppNavigationScreen()),
+          );
+        }
+        // -----------------------------
+
       } else {
-        _showErrorMessage(
-            response['message'] ?? 'Error desconocido. Intente de nuevo.');
+        _showErrorMessage(response['message'] ?? 'Error desconocido.');
       }
     } catch (e) {
-      _showErrorMessage('Error de conexión. Verifica tu conexión a internet.');
+      _showErrorMessage('Error de conexión.');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
   
